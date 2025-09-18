@@ -4,7 +4,7 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.linear_model import PassiveAggressiveClassifier
+from sklearn.decomposition import PCA
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import roc_auc_score, roc_curve, auc
@@ -66,19 +66,22 @@ X_train, X_test, y_train, y_test = train_test_split(
 # KFold Cross Validation setup
 kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
-# Logistic Regression Model
-model = LogisticRegression(max_iter=1000, random_state=42)
-cv_scores_logreg = cross_val_score(model, X_scaled, y_encoded, cv=kf, scoring='accuracy')
-print("\nKFold Cross-Validation Scores (Logistic Regression):", cv_scores_logreg)
-print("Mean CV Accuracy (Logistic Regression):", cv_scores_logreg.mean())
-model.fit(X_train, y_train)
+# PCA for dimensionality reduction (retain 95% variance)
+pca = PCA(n_components=0.95, random_state=42)
+X_pca = pca.fit_transform(X_scaled)
+print(f"PCA reduced the feature space from {X_scaled.shape[1]} to {X_pca.shape[1]} components.")
 
-# Passive Aggressive Classifier (PAC)
-pac = PassiveAggressiveClassifier(max_iter=1000, random_state=42)
-cv_scores_pac = cross_val_score(pac, X_scaled, y_encoded, cv=kf, scoring='accuracy')
-print("\nKFold Cross-Validation Scores (PAC):", cv_scores_pac)
-print("Mean CV Accuracy (PAC):", cv_scores_pac.mean())
-pac.fit(X_train, y_train)
+# Logistic Regression Model with PCA features
+model = LogisticRegression(max_iter=1000, random_state=42)
+cv_scores_logreg = cross_val_score(model, X_pca, y_encoded, cv=kf, scoring='accuracy')
+print("\nKFold Cross-Validation Scores (Logistic Regression with PCA):", cv_scores_logreg)
+print("Mean CV Accuracy (Logistic Regression with PCA):", cv_scores_logreg.mean())
+
+# Train/test split on PCA features
+X_train_pca, X_test_pca, _, _ = train_test_split(
+    X_pca, y_encoded, test_size=0.17, random_state=42, stratify=y_encoded
+)
+model.fit(X_train_pca, y_train)
 
 # ==============================
 # 6. Evaluación
