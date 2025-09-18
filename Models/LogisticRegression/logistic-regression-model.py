@@ -80,12 +80,47 @@ print("Mean CV Accuracy (Logistic Regression with PCA, balanced):", cv_scores_lo
 # Cross-validated ROC AUC (macro average)
 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 y_pred_proba_cv = cross_val_predict(model, X_pca, y_encoded, cv=skf, method='predict_proba')
-y_binarized_cv = label_binarize(y_encoded, classes=le.transform(le.classes_))
-if y_binarized_cv.shape[1] > 1:
+
+# For binary classification, use the positive class probabilities directly
+if len(le.classes_) == 2:
+    # Binary case: use probabilities for the positive class (class 1)
+    roc_auc_cv = roc_auc_score(y_encoded, y_pred_proba_cv[:, 1])
+    print(f"Cross-validated ROC AUC Score (binary): {roc_auc_cv:.4f}")
+    
+    # Plot ROC curve for binary classification
+    fpr, tpr, _ = roc_curve(y_encoded, y_pred_proba_cv[:, 1])
+    plt.figure(figsize=(8, 6))
+    plt.plot(fpr, tpr, color='b', lw=2, label=f'ROC curve (area = {auc(fpr, tpr):.2f})')
+    plt.plot([0, 1], [0, 1], 'k--', lw=2)
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Cross-Validated ROC AUC Curve (Binary Classification)')
+    plt.legend(loc="lower right")
+    plt.show()
+else:
+    # Multiclass case
+    y_binarized_cv = label_binarize(y_encoded, classes=le.transform(le.classes_))
     roc_auc_cv = roc_auc_score(y_binarized_cv, y_pred_proba_cv, average="macro")
     print(f"Cross-validated ROC AUC Score (macro average): {roc_auc_cv:.4f}")
-else:
-    print("Cross-validated ROC AUC not computed: Only one class present.")
+
+    # Plot ROC curve for each class
+    plt.figure(figsize=(8, 6))
+    colors = plt.cm.get_cmap('tab10', len(le.classes_))
+    for i, class_name in enumerate(le.classes_):
+        fpr, tpr, _ = roc_curve(y_binarized_cv[:, i], y_pred_proba_cv[:, i])
+        roc_auc = auc(fpr, tpr)
+        plt.plot(fpr, tpr, color=colors(i), lw=2,
+                 label=f'ROC curve of class {class_name} (area = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], 'k--', lw=2)
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Cross-Validated ROC AUC Curve for Multiclass Logistic Regression')
+    plt.legend(loc="lower right")
+    plt.show()
 
 # Train/test split on PCA features
 X_train_pca, X_test_pca, _, _ = train_test_split(
