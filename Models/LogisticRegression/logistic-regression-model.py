@@ -4,8 +4,12 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import PassiveAggressiveClassifier
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.utils.multiclass import unique_labels
+from sklearn.metrics import roc_auc_score, roc_curve, auc
+from sklearn.preprocessing import label_binarize
+from sklearn.model_selection import KFold, cross_val_score
 
 # ==============================
 # 1. Cargar datos
@@ -58,8 +62,23 @@ X_train, X_test, y_train, y_test = train_test_split(
 # ==============================
 # 5. Modelo
 # ==============================
+
+# KFold Cross Validation setup
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+# Logistic Regression Model
 model = LogisticRegression(max_iter=1000, random_state=42)
+cv_scores_logreg = cross_val_score(model, X_scaled, y_encoded, cv=kf, scoring='accuracy')
+print("\nKFold Cross-Validation Scores (Logistic Regression):", cv_scores_logreg)
+print("Mean CV Accuracy (Logistic Regression):", cv_scores_logreg.mean())
 model.fit(X_train, y_train)
+
+# Passive Aggressive Classifier (PAC)
+pac = PassiveAggressiveClassifier(max_iter=1000, random_state=42)
+cv_scores_pac = cross_val_score(pac, X_scaled, y_encoded, cv=kf, scoring='accuracy')
+print("\nKFold Cross-Validation Scores (PAC):", cv_scores_pac)
+print("Mean CV Accuracy (PAC):", cv_scores_pac.mean())
+pac.fit(X_train, y_train)
 
 # ==============================
 # 6. Evaluación
@@ -77,3 +96,45 @@ print(classification_report(y_test, y_pred, target_names=le.classes_[present_cla
 cm = confusion_matrix(y_test, y_pred, labels=present_classes)
 ConfusionMatrixDisplay(cm, display_labels=le.classes_[present_classes]).plot(cmap="Blues")
 plt.show()
+
+# ==============================
+# 7. ROC AUC Curve (Multiclass)
+# ==============================
+
+
+# Binarize the output for multiclass ROC AUC
+y_test_binarized = label_binarize(y_test, classes=present_classes)
+y_score = model.decision_function(X_test)
+if y_score.ndim == 1:
+    y_score = y_score.reshape(-1, 1)
+
+fpr = dict()
+tpr = dict()
+roc_auc = dict()
+for i in range(len(present_classes)):
+    fpr[i], tpr[i], _ = roc_curve(y_test_binarized[:, i], y_score[:, i])
+    roc_auc[i] = auc(fpr[i], tpr[i])
+
+# Plot all ROC curves
+plt.figure(figsize=(8, 6))
+colors = plt.cm.get_cmap('tab10', len(present_classes))
+for i, class_idx in enumerate(present_classes):
+    plt.plot(fpr[i], tpr[i], color=colors(i), lw=2,
+             label=f'ROC curve of class {le.classes_[class_idx]} (area = {roc_auc[i]:0.2f})')
+plt.plot([0, 1], [0, 1], 'k--', lw=2)
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC AUC Curve for Multiclass Logistic Regression')
+plt.legend(loc="lower right")
+plt.show()
+plt.legend(loc="lower right")
+plt.show()
+
+# ==============================
+# 8. ROC AUC Score (Multiclass)
+# ==============================
+# Calculate and print the overall ROC AUC score (macro average)
+roc_auc_score_macro = roc_auc_score(y_test_binarized, y_score, average="macro")
+print(f"\nROC AUC Score (macro average): {roc_auc_score_macro:.4f}")
