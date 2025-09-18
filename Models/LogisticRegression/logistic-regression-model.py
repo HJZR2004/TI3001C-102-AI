@@ -9,12 +9,12 @@ from sklearn.metrics import classification_report, confusion_matrix, ConfusionMa
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import roc_auc_score, roc_curve, auc
 from sklearn.preprocessing import label_binarize
-from sklearn.model_selection import KFold, cross_val_score
+from sklearn.model_selection import KFold, cross_val_score, StratifiedKFold, cross_val_predict
 
 # ==============================
 # 1. Cargar datos
 # ==============================
-df = pd.read_csv("../../Data/Processed_Activities.csv")
+df = pd.read_csv(r"Data\Processed_Activities.csv")
 
 # ==============================
 # 2. Conocer los labels
@@ -71,11 +71,21 @@ pca = PCA(n_components=0.95, random_state=42)
 X_pca = pca.fit_transform(X_scaled)
 print(f"PCA reduced the feature space from {X_scaled.shape[1]} to {X_pca.shape[1]} components.")
 
-# Logistic Regression Model with PCA features
-model = LogisticRegression(max_iter=1000, random_state=42)
+# Logistic Regression Model with PCA features and class_weight balanced
+model = LogisticRegression(max_iter=1000, random_state=42, class_weight='balanced')
 cv_scores_logreg = cross_val_score(model, X_pca, y_encoded, cv=kf, scoring='accuracy')
-print("\nKFold Cross-Validation Scores (Logistic Regression with PCA):", cv_scores_logreg)
-print("Mean CV Accuracy (Logistic Regression with PCA):", cv_scores_logreg.mean())
+print("\nKFold Cross-Validation Scores (Logistic Regression with PCA, balanced):", cv_scores_logreg)
+print("Mean CV Accuracy (Logistic Regression with PCA, balanced):", cv_scores_logreg.mean())
+
+# Cross-validated ROC AUC (macro average)
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+y_pred_proba_cv = cross_val_predict(model, X_pca, y_encoded, cv=skf, method='predict_proba')
+y_binarized_cv = label_binarize(y_encoded, classes=le.transform(le.classes_))
+if y_binarized_cv.shape[1] > 1:
+    roc_auc_cv = roc_auc_score(y_binarized_cv, y_pred_proba_cv, average="macro")
+    print(f"Cross-validated ROC AUC Score (macro average): {roc_auc_cv:.4f}")
+else:
+    print("Cross-validated ROC AUC not computed: Only one class present.")
 
 # Train/test split on PCA features
 X_train_pca, X_test_pca, _, _ = train_test_split(
@@ -83,10 +93,11 @@ X_train_pca, X_test_pca, _, _ = train_test_split(
 )
 model.fit(X_train_pca, y_train)
 
+
 # ==============================
 # 6. Evaluación
 # ==============================
-y_pred = model.predict(X_test)
+y_pred = model.predict(X_test_pca)
 
 # Obtener las clases presentes en y_test
 present_classes = unique_labels(y_test)
@@ -105,35 +116,38 @@ plt.show()
 # ==============================
 
 
+
+
 # Binarize the output for multiclass ROC AUC
 y_test_binarized = label_binarize(y_test, classes=present_classes)
-y_score = model.decision_function(X_test)
+y_score = model.decision_function(X_test_pca)
 if y_score.ndim == 1:
     y_score = y_score.reshape(-1, 1)
 
-fpr = dict()
-tpr = dict()
-roc_auc = dict()
-for i in range(len(present_classes)):
-    fpr[i], tpr[i], _ = roc_curve(y_test_binarized[:, i], y_score[:, i])
-    roc_auc[i] = auc(fpr[i], tpr[i])
+if y_test_binarized.shape[1] > 1:
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    for i in range(y_test_binarized.shape[1]):
+        fpr[i], tpr[i], _ = roc_curve(y_test_binarized[:, i], y_score[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
 
-# Plot all ROC curves
-plt.figure(figsize=(8, 6))
-colors = plt.cm.get_cmap('tab10', len(present_classes))
-for i, class_idx in enumerate(present_classes):
-    plt.plot(fpr[i], tpr[i], color=colors(i), lw=2,
-             label=f'ROC curve of class {le.classes_[class_idx]} (area = {roc_auc[i]:0.2f})')
-plt.plot([0, 1], [0, 1], 'k--', lw=2)
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('ROC AUC Curve for Multiclass Logistic Regression')
-plt.legend(loc="lower right")
-plt.show()
-plt.legend(loc="lower right")
-plt.show()
+    # Plot all ROC curves
+    plt.figure(figsize=(8, 6))
+    colors = plt.cm.get_cmap('tab10', y_test_binarized.shape[1])
+    for i, class_idx in enumerate(present_classes):
+        plt.plot(fpr[i], tpr[i], color=colors(i), lw=2,
+                 label=f'ROC curve of class {le.classes_[class_idx]} (area = {roc_auc[i]:0.2f})')
+    plt.plot([0, 1], [0, 1], 'k--', lw=2)
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC AUC Curve for Multiclass Logistic Regression')
+    plt.legend(loc="lower right")
+    plt.show()
+else:
+    print("\nROC AUC curve not plotted: Only one class present in y_test.")
 
 # ==============================
 # 8. ROC AUC Score (Multiclass)
