@@ -14,7 +14,7 @@ from sklearn.model_selection import KFold, cross_val_score, StratifiedKFold, cro
 # ==============================
 # 1. Cargar datos
 # ==============================
-df = pd.read_csv(r"Data\Processed_Activities.csv")
+df = pd.read_csv("../../Data/Processed_Activities.csv")
 
 # ==============================
 # 2. Conocer los labels
