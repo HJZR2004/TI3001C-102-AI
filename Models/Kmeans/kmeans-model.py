@@ -70,3 +70,39 @@ plt.show()
 
 # Conteo por grupo
 print(df["cluster"].value_counts())
+
+# ==============================
+# Training Function for Interface
+# ==============================
+def train_kmeans_model():
+    """
+    Function to train the K-means model and return all necessary components
+    for making predictions on new data.
+    
+    Returns:
+        dict: Dictionary containing trained model and preprocessing components
+    """
+    # Load data
+    df = pd.read_csv(r"Data\Processed_Activities.csv")
+    
+    # Variables numéricas (sin incluir la etiqueta)
+    X = df.drop(columns=["tipo_de_actividad"])
+    
+    # Escalar
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    # PCA for visualization (2 components)
+    pca_viz = PCA(n_components=2, random_state=42)
+    X_pca = pca_viz.fit_transform(X_scaled)
+    
+    # Entrenar con k clusters
+    kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+    kmeans.fit(X_scaled)
+    
+    return {
+        'kmeans_model': kmeans,
+        'scaler': scaler,
+        'pca_viz': pca_viz,
+        'feature_names': X.columns.tolist()
+    }
