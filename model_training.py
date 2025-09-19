@@ -18,7 +18,7 @@ def train_logistic_regression_model():
         dict: Dictionary containing trained model and preprocessing components
     """
     # Load data
-    df = pd.read_csv(r"Data\Processed_Activities.csv")
+    df = pd.read_csv("Data/Processed_Activities.csv")
     
     # Variables predictoras y objetivo
     X = df[["distancia", "calorias", "tiempo",
@@ -58,13 +58,13 @@ def train_logistic_regression_model():
 def train_kmeans_model():
     """
     Function to train the K-means model and return all necessary components
-    for making predictions on new data.
+    for making predictions on new data.m
     
     Returns:
         dict: Dictionary containing trained model and preprocessing components
     """
     # Load data
-    df = pd.read_csv(r"Data\Processed_Activities.csv")
+    df = pd.read_csv("Data/Processed_Activities.csv")
     
     # Variables numéricas (sin incluir la etiqueta)
     X = df.drop(columns=["tipo_de_actividad"])
